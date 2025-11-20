@@ -1,0 +1,73 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script type="module" src="script.js"></script>
+<link rel="stylesheet" href="index.css">
+
+<!-- INPUT -->
+<input id="text" placeholder="search or enter url">
+
+<!-- SEARCH BUTTON -->
+<button class="search-btn" id="searchBtn" 
+style="border:0; background:none; padding:0; position: absolute; top: 10px; left: 280px;">
+    <img src="magnifying-glass.jpg" width="30">
+</button>
+
+<style>
+.search-btn img {
+    transition: 0.25s ease;
+}
+.search-btn:hover img {
+    opacity: 0.75;
+}
+.search-btn:active img {
+    opacity: 0.5;
+}
+</style>
+
+<!-- IFRAME -->
+<iframe src="" style="width:345px; height:700px; border:10px solid #ccc; border-radius:8px;"></iframe>
+
+<!-- ADEXIUM SCRIPT -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.tgads.space/assets/js/tg-ads-co-widget.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    /* 1. Adexium reklama vidjetini ishga tushirish */
+    const adexiumAds = new AdexiumWidget({
+        wid: 'a02f1861-5f60-4748-aefe-3bd7192dfc0e', // SENING WID'ING
+        adFormat: 'interstitial',
+        debug: false
+    });
+
+    /* 2. Search tugmasini olish */
+    const searchBtn = document.getElementById('searchBtn');
+
+    /* 3. Tugmaga bosilganda — reklama so‘raladi */
+    searchBtn.onclick = () => {
+        console.log("Reklama uchun so‘rov yuborilmoqda...");
+        adexiumAds.requestAd('interstitial');
+    };
+
+    /* 🔥 Reklama eventlari */
+
+    adexiumAds.on('adReceived', (ad) => {
+        console.log("Reklama qabul qilindi:", ad);
+        adexiumAds.displayAd(ad);
+    });
+
+    adexiumAds.on('noAdFound', () => {
+        console.log('Reklama topilmadi.');
+        alert("Hozircha reklama mavjud emas.");
+    });
+
+    adexiumAds.on('adClosed', () => {
+        console.log('Reklama yopildi.');
+    });
+
+    adexiumAds.on('adDisplayed', () => {
+        console.log('Reklama ko‘rsatildi.');
+    });
+
+});
+</script>
