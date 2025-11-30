@@ -75,7 +75,6 @@
         position: relative;
         height: 250px; 
         margin: 20px auto;
-        /* Bulutlar joylashishi uchun overflow yashiriladi */
         overflow: hidden; 
     }
 
@@ -83,15 +82,14 @@
         width: 150px; 
         height: auto;
         position: absolute;
-        bottom: 0; /* Raketa pastdan boshlanadi */
+        bottom: 0;
         left: 50%;
         transform: translateX(-50%);
         transition: opacity 0.5s;
-        z-index: 5; /* Bulutlarning orqasida bo'lishi uchun */
+        z-index: 5;
     }
 
     .animating {
-        /* Eski 'fly' animatsiyasi o'rniga 'launch' ishlatiladi */
         animation: launch 5s ease-in-out infinite alternate;
     }
     
@@ -102,7 +100,7 @@
         border-radius: 50%;
         opacity: 0.7;
         box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-        display: none; /* Standart holatda yashirin */
+        display: none;
     }
 
     .cloud1 { width: 80px; height: 30px; top: 180px; left: 10%; animation: floatCloud 20s linear infinite; z-index: 1; }
@@ -110,8 +108,6 @@
     .cloud3 { width: 90px; height: 35px; top: 120px; left: 30%; animation: floatCloud 25s linear infinite; z-index: 1; }
 
     /* === Animatsiyalar === */
-    
-    /* Raketani osmonga uchirish animatsiyasi */
     @keyframes launch {
         0% { 
             transform: translate(-50%, 0) rotate(0deg); 
@@ -126,11 +122,10 @@
             opacity: 1;
         }
         100% { 
-            transform: translate(-50%, 0) rotate(0deg); /* Qaytish joyi*/
+            transform: translate(-50%, 0) rotate(0deg); 
         }
     }
     
-    /* Bulutlarning gorizontal harakati (osmonda suzish) */
     @keyframes floatCloud {
         0% { transform: translateX(0); }
         50% { transform: translateX(50px); }
@@ -150,6 +145,59 @@
         font-size: 18px;
         box-shadow: 0 4px 10px rgba(0,123,255,0.4);
         cursor: pointer;
+    }
+
+    /* === YANGI: Status Bloklari Stili === */
+    .status-container {
+        display: flex;
+        justify-content: space-around;
+        align-items: flex-start;
+        width: 100%;
+        max-width: 350px;
+        margin: 20px auto 0;
+    }
+
+    .status-item {
+        text-align: center;
+        flex-basis: 45%;
+    }
+
+    .status-icon {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 5px;
+        /* Ikonkalar uchun joylashtirgich - PNG yo'lini o'zgartiring! */
+        background-color: #f0f0f0; 
+        border-radius: 5px;
+        display: inline-block;
+        line-height: 50px;
+        font-size: 20px;
+        color: #555;
+    }
+
+    .status-value {
+        font-weight: bold;
+        font-size: 16px;
+        color: white;
+        text-shadow: 0 0 3px #000;
+    }
+
+    .refill-btn {
+        padding: 8px 15px;
+        margin-top: 10px;
+        background: #ff5722;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.3s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .refill-btn:disabled {
+        background: #cccccc;
+        cursor: not-allowed;
     }
 
 </style>
@@ -174,7 +222,20 @@
         <img src="rocket.png" alt="Rocket Miner" class="rocket-image" id="rocket"> 
     </div>
 
-    <button class="main-btn" onclick="showAd()">launch rocket miner</button>
+    <div class="status-container">
+        <div class="status-item">
+            <img src="shield.png" alt="Shield" class="status-icon" style="background: none; width: 40px; height: 40px;"> 
+            <div class="status-value" id="shield-value">0%</div> 
+            <button class="refill-btn" id="shield-btn" onclick="getShield()">Get Shield</button>
+        </div>
+
+        <div class="status-item">
+            <img src="fuel.png" alt="Fuel" class="status-icon" style="background: none; width: 40px; height: 40px;">
+            <div class="status-value" id="fuel-value">0%</div> 
+            <button class="refill-btn" id="fuel-btn" onclick="refuel()">Refuel</button>
+        </div>
+    </div>
+    <button class="main-btn" id="launch-btn" onclick="launchMiner()">launch rocket miner</button>
 </div>
 
 
@@ -182,7 +243,7 @@
 <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, child, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 // === FIREBASE KONFIGURATSIYASI ===
 const firebaseConfig = {
@@ -207,48 +268,101 @@ if(!deviceId){
 }
 
 let balance = 0.00;
-const adBtn = document.querySelector(".main-btn");
-const rocketImg = document.getElementById("rocket");
-// === Bulut elementlari tanlab olindi ===
-const clouds = [document.getElementById("cloud1"), document.getElementById("cloud2"), document.getElementById("cloud3")]; 
-// =======================================
+// === O'ZGARTIRILDI: Boshlang'ich foiz 0% bo'lishi uchun ===
+let fuel = 0; 
+let shield = 0;
+// ========================================================
+const fuelValueEl = document.getElementById("fuel-value");
+const shieldValueEl = document.getElementById("shield-value");
+const fuelBtn = document.getElementById("fuel-btn");
+const shieldBtn = document.getElementById("shield-btn");
 
+const adBtn = document.getElementById("launch-btn");
+const rocketImg = document.getElementById("rocket");
+const clouds = [document.getElementById("cloud1"), document.getElementById("cloud2"), document.getElementById("cloud3")]; 
 let remainingTime = 0;
 const TIMER_SECONDS = 300; // 5 daqiqa
-let lastAdTime = 0;
+const MINING_REWARD = 0.05;
+const REWARD_PER_SECOND = MINING_REWARD / TIMER_SECONDS; 
+const DECREMENT_RATE = 100 / TIMER_SECONDS; 
 
 let AdController = null; 
+let miningInterval = null; 
 
-// ===============================================
-// === YECHIM QISMI: ADSGRAM NI KEYIN ISHGA TUSHIRISH ===
-// ===============================================
+// === ADSGRAM/ADSONAR Funksiyalari (Refuel va Shield uchun) ===
+
+function onRefillComplete(resource) {
+    if (resource === 'fuel') {
+        fuel = 100;
+        alert("Yoqilg'i muvaffaqiyatli to'ldirildi (100%)!");
+    } else if (resource === 'shield') {
+        shield = 100;
+        alert("Qalqon muvaffaqiyatli tiklandi (100%)!");
+    }
+    updateStatus();
+    // Firebase'da ma'lumotni yangilash
+    update(ref(db, "users/" + deviceId), { fuel: fuel, shield: shield });
+}
+
+function showRefillAd(resource) {
+    // Agar allaqachon 100% bo'lsa, reklamani ko'rsatmaslik
+    if ((resource === 'fuel' && fuel >= 100) || (resource === 'shield' && shield >= 100)) {
+        alert(resource === 'fuel' ? "Yoqilg'i to'la." : "Qalqon to'la.");
+        return;
+    }
+
+    if (window.Adsgram && AdController) {
+        AdController.show().then(() => {
+            onRefillComplete(resource);
+        }).catch(err => { 
+            console.log(err); 
+            alert(`Reklama yuklanmadi. Iltimos, qayta urinib ko'ring.`);
+        });
+    } else {
+        alert("AdsGram tizimi yuklanmagan. Iltimos, mini app'ni qayta ishga tushiring.");
+    }
+}
+
+window.refuel = function() {
+    showRefillAd('fuel');
+};
+
+window.getShield = function() {
+    showRefillAd('shield');
+};
+// =============================================================
+
+// === LAUNCH MINER LOGIKASI ===
+window.launchMiner = function() {
+    if (remainingTime > 0) return; 
+    
+    // 1. Foizlarni tekshirish
+    if (Math.floor(fuel) < 100 || Math.floor(shield) < 100) {
+        let missing = [];
+        if (Math.floor(fuel) < 100) missing.push("Yoqilg'i (Fuel)");
+        if (Math.floor(shield) < 100) missing.push("Qalqon (Shield)");
+
+        alert(`Raketani uchirish uchun ${missing.join(" va ")} 100% bo'lishi kerak. Iltimos, reklamani ko'rib to'ldiring.`);
+        return;
+    }
+    
+    // 2. Taymerni boshlash
+    remainingTime = TIMER_SECONDS;
+    startTimer();
+
+    // 3. Ma'lumotlarni saqlash (Taymer boshlanganda)
+    let lastLaunchTime = Date.now();
+    update(ref(db, "users/" + deviceId), { 
+        lastLaunchTime: lastLaunchTime, 
+        isMining: true 
+    });
+};
+// =============================================================
 
 function initializeAdsgram() {
     if (window.Adsgram && !AdController) {
         AdController = window.Adsgram.init({blockId:"int-18409"});
         console.log("Adsgram muvaffaqiyatli ishga tushirildi.");
-        
-        window.showAd = function() {
-            if (remainingTime > 0) return;
-            
-            // Reklamani chiqarish
-            if (AdController) {
-                AdController.show().then(() => {
-                    // Muvaffaqiyatli tugagach:
-                    balance += 0.05;
-                    document.getElementById("balance").innerText = balance.toFixed(2) + " ₽";
-                    lastAdTime = Date.now();
-                    remainingTime = TIMER_SECONDS;
-                    startTimer(); // Taymerni ishga tushirish (Animatsiyani yoqadi)
-                    set(ref(db, "users/" + deviceId), { balance: balance, lastAdTime: lastAdTime });
-                }).catch(err => { 
-                    console.log(err); 
-                    alert("The ad failed to load! (Error: " + err.message + ")");
-                });
-            } else {
-                alert("AdsGram tizimi yuklanmagan. Iltimos, mini app'ni qayta ishga tushiring.");
-            }
-        };
     } else {
         console.log("Adsgram yoki Telegram Web App kutilmoqda...");
     }
@@ -264,21 +378,69 @@ if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData
 }
 
 
-// === ANIMATSIYA VA TAYMER KODI (O'zgartirildi) ===
+// === FOIZLARNI YANGILASH FUNKSIYASI ===
+function updateStatus() {
+    // Faqat butun sonni ko'rsatish
+    fuelValueEl.innerText = `${Math.floor(fuel)}%`;
+    shieldValueEl.innerText = `${Math.floor(shield)}%`;
+    
+    // Tugmalarni yoqish/o'chirish
+    fuelBtn.disabled = Math.floor(fuel) >= 100;
+    shieldBtn.disabled = Math.floor(shield) >= 100;
+}
+// =====================================
 
+// === FIREBASE'dan FOIZLARNI Yuklash ===
 get(child(dbRef, "users/"+deviceId)).then(snapshot=>{
     if(snapshot.exists()){
         const data = snapshot.val();
         if(data.balance) balance = data.balance;
+        
+        // Agar Firebase'da qiymat bo'lsa, uni yuklash. Aks holda, 0 da qoladi.
+        if(data.fuel !== undefined) fuel = data.fuel;
+        if(data.shield !== undefined) shield = data.shield;
+        
         document.getElementById("balance").innerText = balance.toFixed(2)+" ₽";
-        if(data.lastAdTime){
-            lastAdTime = data.lastAdTime;
-            checkTimer();
+        updateStatus();
+        
+        // Agar mining jarayoni tugallanmagan bo'lsa, davom ettirish
+        if(data.isMining && data.lastLaunchTime){
+            const now = Date.now();
+            const diff = Math.floor((now - data.lastLaunchTime) / 1000);
+            
+            if (diff < TIMER_SECONDS) {
+                remainingTime = TIMER_SECONDS - diff;
+                
+                // O'tkazib yuborilgan vaqt uchun daromad va foizni hisoblash
+                balance += diff * REWARD_PER_SECOND;
+                fuel = Math.max(0, fuel - (diff * DECREMENT_RATE));
+                shield = Math.max(0, shield - (diff * DECREMENT_RATE));
+
+                // Barcha qiymatlarni yangilash
+                document.getElementById("balance").innerText = balance.toFixed(2)+" ₽";
+                updateStatus();
+                
+                startTimer();
+                console.log(`Davom etish: ${diff} soniya o'tgan.`);
+            } else {
+                // Agar 5 daqiqadan ko'p o'tgan bo'lsa
+                balance += (TIMER_SECONDS * REWARD_PER_SECOND);
+                fuel = 0;
+                shield = 0;
+                update(ref(db, "users/" + deviceId), { balance: balance, fuel: fuel, shield: shield, isMining: false });
+                document.getElementById("balance").innerText = balance.toFixed(2)+" ₽";
+                updateStatus();
+            }
         }
+    } else {
+        // === O'ZGARTIRILDI: Yangi foydalanuvchi bo'lsa, 0% bilan saqlash ===
+        update(ref(db, "users/" + deviceId), { fuel: 0, shield: 0, balance: 0.00 });
+        // ===============================================================
     }
 });
 
-// === JS kodiga Bulutlarni ko'rsatish funksiyasi qo'shildi ===
+// === ANIMATSIYA VA TAYMER KODI ===
+
 function toggleCloudVisibility(shouldShow) {
     clouds.forEach(cloud => {
         cloud.style.display = shouldShow ? 'block' : 'none';
@@ -287,50 +449,66 @@ function toggleCloudVisibility(shouldShow) {
 
 function toggleRocketAnimation(shouldAnimate) {
     if (shouldAnimate) {
-        rocketImg.classList.remove("animating"); // Eski animatsiyani o'chirish
-        rocketImg.classList.add("animating"); // Yangi animatsiyani yoqish
-        toggleCloudVisibility(true); // Bulutlarni ko'rsatish
+        rocketImg.classList.remove("animating"); 
+        rocketImg.classList.add("animating"); 
+        toggleCloudVisibility(true); 
     } else {
         rocketImg.classList.remove("animating");
-        toggleCloudVisibility(false); // Bulutlarni yashirish
+        toggleCloudVisibility(false); 
     }
 }
 
-function checkTimer(){
-    const now = Date.now();
-    const diff = Math.floor((now-lastAdTime)/1000);
-    if(diff<TIMER_SECONDS){
-        remainingTime = TIMER_SECONDS-diff;
-        startTimer();
-    } else {
-        adBtn.disabled = false;
-        adBtn.innerText = "launch rocket miner";
-        toggleRocketAnimation(false); 
-    }
+function stopMining() {
+    clearInterval(miningInterval);
+    adBtn.disabled = false;
+    adBtn.innerText = "launch rocket miner";
+    toggleRocketAnimation(false);
+    
+    // Mining tugagani haqida Firebase'ga xabar berish
+    update(ref(db, "users/" + deviceId), { isMining: false });
 }
 
 function startTimer(){
+    if (miningInterval) clearInterval(miningInterval); 
+    
     adBtn.disabled = true;
     toggleRocketAnimation(true); 
     
-    const interval = setInterval(()=>{
+    miningInterval = setInterval(()=>{
         let m=Math.floor(remainingTime/60);
         let s=remainingTime%60;
         adBtn.innerText=`${m}:${s<10?"0"+s:s}`;
         
+        if(remainingTime > 0){
+            // Har soniyada balansni oshirish (bosqichma-bosqich daromad)
+            balance += REWARD_PER_SECOND;
+            document.getElementById("balance").innerText = balance.toFixed(2)+" ₽";
+            
+            // Foizlarni kamaytirish
+            fuel = Math.max(0, fuel - DECREMENT_RATE);
+            shield = Math.max(0, shield - DECREMENT_RATE);
+            updateStatus();
+            
+            // Firebase'da faqat balans va foizlarni yangilash
+            update(ref(db, "users/" + deviceId), { 
+                balance: balance, 
+                fuel: fuel, 
+                shield: shield 
+            });
+        }
+        
         if(remainingTime<=0){
-            clearInterval(interval);
-            adBtn.disabled=false;
-            adBtn.innerText="launch rocket miner";
-            toggleRocketAnimation(false); 
+            stopMining();
+            fuel = 0;
+            shield = 0;
+            updateStatus();
         }
         remainingTime--;
     },1000);
 }
 
-// Eslatma: window.showAd endi initializeAdsgram ichida aniqlangan.
+// Eslatma: Barcha funksiyalar (launchMiner, refuel, getShield) yangi mantiq asosida ishlaydi.
 </script>
 
 </body>
-  </html>
-  
+</html>
